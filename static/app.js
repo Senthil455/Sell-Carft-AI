@@ -292,6 +292,16 @@ function wire() {
     if (files.length) addFiles(files);
   });
 
+  // bundled sample photos — also how the demo works with no camera roll handy
+  document.querySelectorAll(".sample").forEach((b) => b.onclick = async () => {
+    try {
+      const res = await fetch("/samples/" + b.dataset.sample);
+      if (!res.ok) return toast("Sample not found locally.");
+      const blob = await res.blob();
+      await addFiles([new File([blob], b.dataset.sample, { type: blob.type || "image/jpeg" })]);
+    } catch { toast("Couldn't load the sample."); }
+  });
+
   document.querySelectorAll(".seg-btn").forEach((b) => b.onclick = () => {
     document.querySelectorAll(".seg-btn").forEach((x) => { x.classList.remove("active"); x.setAttribute("aria-selected", "false"); });
     b.classList.add("active"); b.setAttribute("aria-selected", "true");

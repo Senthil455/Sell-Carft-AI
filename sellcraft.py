@@ -32,6 +32,7 @@ from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
+SAMPLES_DIR = ROOT / "samples"
 DB_PATH = ROOT / "sellcraft.db"
 OLLAMA = "http://127.0.0.1:11434"
 DEFAULT_MODEL = "gemma4:latest"
@@ -162,14 +163,18 @@ def build_prompt(payload: dict) -> str:
     n = len(photos)
 
     if platform == "ebay":
-        title_rule = f"one line, {EBAY_TITLE_LIMIT} characters max, keyword-first, no emoji"
+        title_rule = f"one line, {EBAY_TITLE_LIMIT} characters max (count them), keyword-first, no emoji"
         tail_label = "KEYWORDS"
         tail_rule = (
             f"{EBAY_KEYWORDS} comma-separated keywords, lowercase, mix of broad and specific, "
             "no duplicates"
         )
     else:
-        title_rule = f"one line, {ETSY_TITLE_LIMIT} characters max, keyword-first, no emoji"
+        title_rule = (
+            f"one line of 100-{ETSY_TITLE_LIMIT} characters (never over {ETSY_TITLE_LIMIT}), shaped like: "
+            "MATERIAL + ITEM + key feature + who it is for. Front-load the strongest buyer keywords. "
+            "Never repeat a word, no emoji, no ALL-CAPS, no \"|\" or \"-\" chains"
+        )
         tail_label = "TAGS"
         tail_rule = (
             f"{ETSY_TAG_COUNT} comma-separated tags, each one {ETSY_TAG_LIMIT} characters or fewer "
@@ -285,9 +290,10 @@ def tidy_listing(parts: dict, platform: str) -> dict:
             cut = t[:cap]
             if " " in cut:
                 cut = cut[: cut.rfind(" ")]
-            t = cut.rstrip(" ,;-")
-            if len(t) < 4:
-                continue
+            cut = cut.rstrip(" ,;-")
+            if len(cut) < max(4, int(len(t) * 0.6)):
+                continue  # trimming would gut the phrase; skip it instead
+            t = cut
         if not t or t in seen:
             continue
         seen.add(t)
@@ -539,8 +545,12 @@ class Handler(BaseHTTPRequestHandler):
     def serve_static(self, path: str):
         if path in ("/", ""):
             path = "/index.html"
-        target = (STATIC_DIR / path.lstrip("/")).resolve()
-        if not str(target).startswith(str(STATIC_DIR)) or not target.is_file():
+        base = STATIC_DIR
+        if path.startswith("/samples/"):
+            base = SAMPLES_DIR
+            path = path[len("/samples"):]
+        target = (base / path.lstrip("/")).resolve()
+        if not str(target).startswith(str(base)) or not target.is_file():
             return self.send_json({"error": "not found"}, 404)
         data = target.read_bytes()
         self.send_response(200)
