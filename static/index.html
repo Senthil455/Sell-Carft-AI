@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SellCraft AI — your listings, written on your laptop</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23b3441e'/%3E%3Cpath d='M9 21.5c2.5-1 4-3 4.6-6l2.9.4c.6 3 1.9 4.5 4.5 5.6l-1.6 1.9c-2.3-.9-3.9-2.2-4.9-4.1-.9 1.9-2.4 3.4-4.3 4.4z' fill='%23faf5ec'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="mark" aria-hidden="true"></span>
+    <div>
+      <h1>SellCraft<span class="ai">&nbsp;AI</span></h1>
+      <p class="tag">Your listings, written on your laptop.</p>
+    </div>
+  </div>
+  <div class="top-right">
+    <span id="status" class="pill pill-wait" title="Checking your local model…">checking local model…</span>
+    <a class="pill pill-link" href="/api/export.csv" title="Download every saved listing as CSV">export CSV</a>
+  </div>
+</header>
+
+<div id="offline" class="banner hidden">
+  <strong>Ollama isn't reachable.</strong>
+  Start the Ollama app (or run <code>ollama serve</code>), then
+  <button id="recheck" class="linkbtn">re-check</button>. First time here? Run
+  <code>ollama pull gemma4</code> once — then the model lives on this machine forever.
+</div>
+
+<main>
+  <!-- ------------------------------------------------ studio -->
+  <section class="card studio" aria-label="Studio">
+    <div class="step">
+      <h2><span class="n">1</span> Photograph the piece</h2>
+      <label id="drop" class="drop" tabindex="0">
+        <input id="file" type="file" accept="image/*" multiple hidden />
+        <span class="drop-ico" aria-hidden="true">＋</span>
+        <span class="drop-t">Drop product photos here</span>
+        <span class="drop-s">or click to browse &middot; up to 4 &middot; they never leave this machine</span>
+      </label>
+      <div id="thumbs" class="thumbs"></div>
+    </div>
+
+    <div class="step">
+      <h2><span class="n">2</span> The details only you know</h2>
+      <div class="facts">
+        <label>Materials <input id="materials" placeholder="e.g. stoneware clay, food-safe glaze" /></label>
+        <label>Size <input id="size" placeholder="e.g. holds 350 ml, 9 cm tall" /></label>
+        <label>Price <input id="price" placeholder="e.g. ₹1,450" /></label>
+        <label>Keywords you want hit <input id="keywords" placeholder="e.g. coffee mug, handmade gift" /></label>
+        <label class="wide">Anything else <textarea id="notes" rows="2" placeholder="e.g. fired twice in my studio kiln, slight speckle on the base is intentional"></textarea></label>
+      </div>
+    </div>
+
+    <div class="step">
+      <h2><span class="n">3</span> Where it's going</h2>
+      <div class="row">
+        <div class="seg" role="tablist" aria-label="Platform">
+          <button class="seg-btn active" data-platform="etsy" role="tab" aria-selected="true">Etsy</button>
+          <button class="seg-btn" data-platform="ebay" role="tab" aria-selected="false">eBay</button>
+        </div>
+        <div class="tones" id="tones" aria-label="Tone">
+          <button class="tone active" data-tone="warm">warm</button>
+          <button class="tone" data-tone="minimal">minimal</button>
+          <button class="tone" data-tone="playful">playful</button>
+          <button class="tone" data-tone="premium">premium</button>
+        </div>
+      </div>
+      <details class="voice">
+        <summary>Shop voice &amp; model setup</summary>
+        <div class="facts">
+          <label>Shop name <input id="shop_name" placeholder="e.g. Clay & Quiet" /></label>
+          <label>Voice <input id="voice" placeholder="e.g. plain, confident, a little wry" /></label>
+          <label class="wide">Model
+            <select id="model"></select>
+          </label>
+        </div>
+        <button id="saveSettings" class="mini">save setup</button>
+        <p class="hint">SellCraft feeds your last few saved listings back into the prompt, so the machine learns <em>your</em> voice over time — without ever sending a word of it anywhere.</p>
+      </details>
+    </div>
+
+    <button id="write" class="primary">Write my listing <span class="pulse" aria-hidden="true"></span></button>
+    <p class="hint center">Runs Gemma 4 on this computer. No account, no API key, nothing metered.</p>
+  </section>
+
+  <!-- ------------------------------------------------ result -->
+  <section class="card result" aria-label="Your listing" aria-live="polite">
+    <div class="res-head">
+      <h2>Your listing</h2>
+      <span id="meta" class="meta">idle</span>
+    </div>
+
+    <article class="block" id="blk-notes">
+      <h3>What I see in the photos <button class="copy" data-copy="notes">copy</button></h3>
+      <div id="out-notes" class="notes empty">The notes appear here — what the model recognised, and anything it wants you to confirm.</div>
+    </article>
+
+    <article class="block">
+      <h3>Title <span id="title-count" class="count">0 / 140</span> <button class="copy" data-copy="title">copy</button></h3>
+      <div id="out-title" class="title empty">—</div>
+    </article>
+
+    <article class="block grow">
+      <h3>Description <button class="copy" data-copy="description">copy</button></h3>
+      <div id="out-description" class="description empty">—</div>
+    </article>
+
+    <article class="block">
+      <h3>Tags <span id="tag-count" class="count">0 / 13</span> <button class="copy" data-copy="tags">copy</button></h3>
+      <div id="out-tags" class="tags"></div>
+    </article>
+
+    <div class="actions">
+      <button id="copyAll" class="ghost">Copy everything</button>
+      <button id="save" class="ghost accent">Save to library</button>
+      <div class="regen">
+        <input id="feedback" placeholder="Regenerate: “make the description shorter”" />
+        <button id="regen" class="ghost">↻ regenerate</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<section class="library">
+  <details id="libWrap">
+    <summary>Your local library <span id="libCount" class="badge">0</span></summary>
+    <div id="lib" class="lib-grid"></div>
+  </details>
+  <p class="privacy">
+    <span class="lock" aria-hidden="true"></span>
+    Every photo, draft and saved listing stays in <code>sellcraft.db</code> on this computer. SellCraft only ever talks to <code>127.0.0.1:11434</code> — your Ollama.
+  </p>
+</section>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/app.js"></script>
+</body>
+</html>
